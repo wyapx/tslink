@@ -19,7 +19,7 @@ func main() {
 
 	logger := core.NewLogger(*logLevel, *useJsonFormatLogger)
 
-	logger.Info("Starting tslink server", "level", *logLevel)
+	logger.Info("Starting tslink server", "level", *logLevel, "configPath", *configPath)
 	cfg, err := core.LoadConfig(*configPath)
 	if err != nil {
 		logger.With(
