@@ -51,20 +51,16 @@ type Config struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "unknown"
-	}
 	cfg := &Config{
 		Core: Core{
-			Hostname:     hostname,
+			Hostname:     "",
 			Ephemeral:    true,
 			AcceptRoutes: true,
 		},
 		Forward: make(map[string][]ForwardRule),
 		Connect: make(map[string][]ConnectRule),
 	}
-	if _, err = os.Stat(path); err != nil {
+	if _, err := os.Stat(path); err != nil {
 		// write a basic config
 		buf := new(bytes.Buffer)
 		err = toml.NewEncoder(buf).Encode(cfg)
@@ -73,9 +69,18 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		err = os.WriteFile(path, buf.Bytes(), 0644)
 	}
-	_, err = toml.DecodeFile(path, cfg)
+	_, err := toml.DecodeFile(path, cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	if cfg.Core.Hostname == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
+		cfg.Core.Hostname = hostname
+	}
+
 	return cfg, nil
 }
