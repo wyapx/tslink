@@ -108,6 +108,8 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 }
 
 func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers []netip.Addr, logger *slog.Logger) {
+	results := make([]LinkPeerConnectivityStatus, len(relativePeers))
+	measureTimeBegin := time.Now()
 	for _, peer := range relativePeers {
 		ping, err := lc.Ping(ctx, peer, tailcfg.PingDisco)
 		if err != nil {
@@ -120,11 +122,19 @@ func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers 
 		} else {
 			connect = ping.DERPRegionCode
 		}
+		results = append(results, LinkPeerConnectivityStatus{
+			Target: peer,
+			Result: ping,
+		})
 		logger.Info("connectivity: peer pinged",
 			"peer", peer,
 			"latency", fmt.Sprintf("%.2fms", ping.LatencySeconds*1000),
 			"connect", connect,
 		)
+	}
+	Events <- &LinkPeerConnectivityEvent{
+		PingResult:  results,
+		PerformedAt: measureTimeBegin,
 	}
 }
 

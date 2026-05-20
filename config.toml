@@ -1,0 +1,10 @@
+[core]
+  auth_key = ""
+  control_url = ""
+  hostname = ""
+  ephemeral = true
+  accept_routes = true
+
+[forward]
+
+[connect]

@@ -29,6 +29,7 @@ func InitTsNet(ctx context.Context, cfg *Core, logger *slog.Logger) (*tsnet.Serv
 	}
 
 	logger.Debug("starting tsnet server")
+	Events <- &LinkInitEvent{LinkInitConnectingTailscale}
 	if err := srv.Start(); err != nil {
 		logger.With(slog.String("error", err.Error())).Error("starting tsnet server failed")
 		return nil, err
@@ -39,6 +40,7 @@ func InitTsNet(ctx context.Context, cfg *Core, logger *slog.Logger) (*tsnet.Serv
 		logger.With(slog.String("error", err.Error())).Error("bring up tsnet server failed")
 		return nil, err
 	}
+	Events <- &LinkInitEvent{LinkInitControlPlaneConnected}
 
 	for _, ip := range status.TailscaleIPs {
 		logger.With(slog.String("ip", ip.String())).Info("ip got from tsnet")
