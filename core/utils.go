@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"tailscale.com/client/local"
+	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsnet"
 )
@@ -109,11 +110,23 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 
 func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers []netip.Addr, logger *slog.Logger) {
 	for _, peer := range relativePeers {
-		ping, err := lc.Ping(ctx, peer, tailcfg.PingDisco)
+		ping, err := func() (*ipnstate.PingResult, error) {
+			cnclCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			ping, err := lc.Ping(cnclCtx, peer, tailcfg.PingDisco)
+			return ping, err
+		}()
+
 		if err != nil {
-			logger.Debug("connectivity: failed to ping peer", "peer", peer, "err", err)
+			if errors.Is(err, context.DeadlineExceeded) {
+				logger.Warn("connectivity: peer ping timeout", "peer", peer)
+			} else {
+				logger.Warn("connectivity: failed to ping peer", "peer", peer, "err", err)
+			}
 			return
 		}
+
 		var connect string
 		if ping.DERPRegionCode == "" {
 			connect = "direct"
