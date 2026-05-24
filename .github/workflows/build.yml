@@ -34,7 +34,7 @@ jobs:
         if [ "${{ matrix.goos }}" = "windows" ]; then
           BINARY_NAME="${BINARY_NAME}.exe"
         fi
-        go build -v -o -ldflags="-s -w" "release/${BINARY_NAME}" .
+        go build -v -trimpath -buildvcs=false -o "release/${BINARY_NAME}" -ldflags="-s -w" .
 
     - name: Compress with UPX
       if: matrix.goos != 'darwin' && !(matrix.goos == 'windows' && matrix.goarch == 'arm64')
