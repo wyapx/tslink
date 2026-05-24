@@ -10,14 +10,20 @@ import (
 	"tailscale.com/tsnet"
 )
 
-func InitTsNet(ctx context.Context, cfg *Core, logger *slog.Logger) (*tsnet.Server, error) {
+func InitTsNet(ctx context.Context, cfg *Core, logger *slog.Logger, withDebugLog bool) (*tsnet.Server, error) {
+	dbgLogger := func(fmt string, args ...interface{}) {}
+	if withDebugLog {
+		logger.Warn("Tsnet debug log activated")
+		dbgLogger = func(fmt string, args ...interface{}) {
+			logger.With(slog.String("from", "tsnet")).Debug(fmt2.Sprintf(fmt, args...))
+		}
+	}
+
 	srv := &tsnet.Server{
 		Hostname:  "tslink-" + cfg.Hostname,
 		AuthKey:   cfg.AuthKey,
 		Ephemeral: cfg.Ephemeral,
-		Logf: func(fmt string, args ...interface{}) {
-			logger.With(slog.String("from", "tsnet")).Debug(fmt2.Sprintf(fmt, args...))
-		},
+		Logf:      dbgLogger,
 		UserLogf: func(fmt string, args ...interface{}) {
 			logger.With(slog.String("from", "tsnet")).Info(fmt2.Sprintf(fmt, args...))
 		},

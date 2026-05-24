@@ -11,7 +11,7 @@ import (
 	"tslink/core"
 )
 
-func serviceLogic(configPath string, logger *slog.Logger) bool {
+func serviceLogic(configPath string, isTsnetDebug bool, logger *slog.Logger) bool {
 	cfg, err := core.LoadConfig(configPath)
 	if err != nil {
 		logger.With(
@@ -22,7 +22,7 @@ func serviceLogic(configPath string, logger *slog.Logger) bool {
 
 	ctx, cancelAll := context.WithCancel(context.Background())
 	logger.Info("initializing tsnet server")
-	srv, err := core.InitTsNet(ctx, &cfg.Core, logger)
+	srv, err := core.InitTsNet(ctx, &cfg.Core, logger, isTsnetDebug)
 	if err != nil {
 		logger.With(
 			slog.String("error", err.Error())).Error("Error initializing tsnet")
@@ -45,7 +45,7 @@ func serviceLogic(configPath string, logger *slog.Logger) bool {
 	go func() {
 		<-ctx.Done()
 		logger.Debug("stopping tsnet service")
-		srv.Close()
+		_ = srv.Close() // just ignore it
 	}()
 
 	for {
@@ -66,6 +66,7 @@ func serviceLogic(configPath string, logger *slog.Logger) bool {
 
 func main() {
 	useJsonFormatLogger := flag.Bool("json-format", false, "use json format logger")
+	showTsnetDebugLog := flag.Bool("diagnose", false, "show tsnet debug log on level=debug")
 	logLevel := flag.String("level", "info", "log level (DEBUG|INFO|WARN|ERROR)")
 	configPath := flag.String("c", "config.toml", "path to config file")
 	flag.Parse()
@@ -75,7 +76,7 @@ func main() {
 	logger.Info("Starting tslink server", "level", *logLevel, "configPath", *configPath)
 
 	for {
-		isStopped := serviceLogic(*configPath, logger)
+		isStopped := serviceLogic(*configPath, *showTsnetDebugLog, logger)
 		if !isStopped {
 			logger.Warn("tslink server restart")
 		} else {
