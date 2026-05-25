@@ -87,7 +87,6 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 			ap, _, err := net.SplitHostPort(rule.DstAddr)
 			if err != nil {
 				logger.Debug("error parsing rule", "tag", tag, "dst", rule.DstAddr, "err", err)
-				// err log
 				continue
 			}
 			addr, err := resolveAddr(ctx, srv, ap)
@@ -118,11 +117,19 @@ func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers 
 			return ping, err
 		}()
 
+		loLog := logger.With("peer", peer)
+		peerInfo, err := lc.WhoIs(ctx, peer.String())
+		if err != nil {
+			loLog.Warn("failed to get peer info", "err", err)
+		} else {
+			loLog = loLog.With("name", peerInfo.Node.ComputedName)
+		}
+
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				logger.Warn("connectivity: peer ping timeout", "peer", peer)
+				loLog.Warn("connectivity: peer ping timeout")
 			} else {
-				logger.Warn("connectivity: failed to ping peer", "peer", peer, "err", err)
+				loLog.Warn("connectivity: failed to ping peer", "err", err)
 			}
 			return
 		}
@@ -133,8 +140,7 @@ func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers 
 		} else {
 			connect = ping.DERPRegionCode
 		}
-		logger.Info("connectivity: peer pinged",
-			"peer", peer,
+		loLog.Info("connectivity: peer pinged",
 			"latency", fmt.Sprintf("%.2fms", ping.LatencySeconds*1000),
 			"connect", connect,
 		)
