@@ -121,6 +121,7 @@ func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers 
 		peerInfo, err := lc.WhoIs(ctx, peer.String())
 		if err != nil {
 			loLog.Warn("failed to get peer info", "err", err)
+			continue
 		} else {
 			loLog = loLog.With("name", peerInfo.Node.ComputedName)
 		}
