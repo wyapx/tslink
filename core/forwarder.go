@@ -18,7 +18,7 @@ func StartForwarders(ctx context.Context, srv *tsnet.Server, rules map[string][]
 		for _, rule := range rrs {
 			rule := rule
 			tag := tag
-			slog.Debug("starting forwarder",
+			slog.Info("starting forwarder",
 				slog.String("tag", tag),
 				slog.String("protocol", rule.Protocol),
 				slog.Int("tailscale_port", rule.TailscalePort),
@@ -43,7 +43,7 @@ func StartConnectors(ctx context.Context, srv *tsnet.Server, rules map[string][]
 			if rule.LocalAddr != "" {
 				args = append(args, slog.String("local_addr", rule.LocalAddr))
 			}
-			slog.Debug("starting connector", args...)
+			slog.Info("starting connector", args...)
 			go runConnector(ctx, srv, rule, tag)
 		}
 	}
@@ -94,7 +94,7 @@ func runTCPForwarder(ctx context.Context, srv *tsnet.Server, rule ForwardRule, l
 		logger.Error("failed to listen", "error", err)
 		return
 	}
-	logger.Info("listening", slog.String("on", fmt.Sprintf("tailscale:%s:%d", ip.String(), rule.TailscalePort)))
+	logger.Debug("listening", slog.String("on", fmt.Sprintf("tailscale:%s:%d", ip.String(), rule.TailscalePort)))
 
 	go func() {
 		<-ctx.Done()
