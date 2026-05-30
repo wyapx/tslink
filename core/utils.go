@@ -110,12 +110,6 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers []netip.Addr, logger *slog.Logger) {
 	for _, peer := range relativePeers {
 		loLog := logger.With("peer", peer)
-		peerInfo, err := lc.WhoIs(ctx, peer.String())
-		if err != nil {
-			loLog.Warn("failed to get peer info", "err", err)
-		} else {
-			loLog = loLog.With("name", peerInfo.Node.ComputedName)
-		}
 
 		ping, err := func() (*ipnstate.PingResult, error) {
 			cnclCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -132,6 +126,13 @@ func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers 
 				loLog.Warn("connectivity: failed to ping peer", "err", err)
 			}
 			continue
+		}
+
+		peerInfo, err := lc.WhoIs(ctx, peer.String())
+		if err != nil {
+			loLog.Warn("failed to get peer info", "err", err)
+		} else {
+			loLog = loLog.With("name", peerInfo.Node.ComputedName)
 		}
 
 		var connect string
