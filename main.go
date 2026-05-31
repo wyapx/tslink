@@ -11,8 +11,15 @@ import (
 	"tslink/core"
 )
 
-func serviceLogic(configPath string, logger *slog.Logger) bool {
-	cfg, err := core.LoadConfig(configPath)
+func serviceLogic(configPath, configURL string, logger *slog.Logger) bool {
+	// Determine config source: URL takes priority, then file
+	configSource := configPath
+	if configURL != "" {
+		configSource = configURL
+		logger.Info("Using config URL", "url", configURL)
+	}
+
+	cfg, err := core.LoadConfig(configSource)
 	if err != nil {
 		logger.With(
 			slog.String("error", err.Error()),
@@ -68,6 +75,7 @@ func main() {
 	useJsonFormatLogger := flag.Bool("json-format", false, "use json format logger")
 	logLevel := flag.String("level", "info", "log level (DEBUG|INFO|WARN|ERROR)")
 	configPath := flag.String("c", "config.toml", "path to config file")
+	configURL := flag.String("config-url", core.DefaultConfigURL, "URL to fetch config from (default from build ldflags)")
 	flag.Parse()
 
 	logger := core.NewLogger(*logLevel, *useJsonFormatLogger)
@@ -75,7 +83,7 @@ func main() {
 	logger.Info("Starting tslink server", "level", *logLevel, "configPath", *configPath)
 
 	for {
-		isStopped := serviceLogic(*configPath, logger)
+		isStopped := serviceLogic(*configPath, *configURL, logger)
 		if !isStopped {
 			logger.Warn("tslink server restart")
 		} else {
