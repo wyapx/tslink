@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"tailscale.com/client/local"
+	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsnet"
 )
@@ -86,7 +87,6 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 			ap, _, err := net.SplitHostPort(rule.DstAddr)
 			if err != nil {
 				logger.Debug("error parsing rule", "tag", tag, "dst", rule.DstAddr, "err", err)
-				// err log
 				continue
 			}
 			addr, err := resolveAddr(ctx, srv, ap)
@@ -109,19 +109,39 @@ func getPeerFromRules(ctx context.Context, srv *tsnet.Server, rules map[string][
 
 func peerConnectivityLogic(ctx context.Context, lc *local.Client, relativePeers []netip.Addr, logger *slog.Logger) {
 	for _, peer := range relativePeers {
-		ping, err := lc.Ping(ctx, peer, tailcfg.PingDisco)
+		loLog := logger.With("peer", peer)
+
+		ping, err := func() (*ipnstate.PingResult, error) {
+			cnclCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			ping, err := lc.Ping(cnclCtx, peer, tailcfg.PingDisco)
+			return ping, err
+		}()
+
 		if err != nil {
-			logger.Debug("connectivity: failed to ping peer", "peer", peer, "err", err)
-			return
+			if errors.Is(err, context.DeadlineExceeded) {
+				loLog.Warn("connectivity: peer ping timeout")
+			} else {
+				loLog.Warn("connectivity: failed to ping peer", "err", err)
+			}
+			continue
 		}
+
+		peerInfo, err := lc.WhoIs(ctx, peer.String())
+		if err != nil {
+			loLog.Warn("failed to get peer info", "err", err)
+		} else {
+			loLog = loLog.With("name", peerInfo.Node.ComputedName)
+		}
+
 		var connect string
 		if ping.DERPRegionCode == "" {
 			connect = "direct"
 		} else {
 			connect = ping.DERPRegionCode
 		}
-		logger.Info("connectivity: peer pinged",
-			"peer", peer,
+		loLog.Info("connectivity: peer pinged",
 			"latency", fmt.Sprintf("%.2fms", ping.LatencySeconds*1000),
 			"connect", connect,
 		)
@@ -159,4 +179,13 @@ func StartPeerConnectivityDiagnostics(ctx context.Context, logger *slog.Logger, 
 			}
 		}
 	}()
+}
+
+func getSelfTsnetAddr(srv *tsnet.Server) netip.Addr {
+	ip4, ip6 := srv.TailscaleIPs()
+	ip := ip4
+	if !ip.IsValid() {
+		ip = ip6
+	}
+	return ip
 }

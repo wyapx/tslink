@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.3'
+        cache: true
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        BINARY_NAME="tslink"
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        go build -v -trimpath -buildvcs=false -o "release/${BINARY_NAME}" -ldflags="-s -w" .
+
+    - name: Compress with UPX
+      if: matrix.goos != 'darwin' && !(matrix.goos == 'windows' && matrix.goarch == 'arm64')
+      uses: crazy-max/ghaction-upx@v4
+      with:
+        files: |
+          release/tslink*
+        args: "-9"
+
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%y%m%d')" >> $GITHUB_OUTPUT
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v5
+      with:
+        name: tslink-dev${{ steps.date.outputs.date }}-${{ matrix.goos }}_${{ matrix.goarch }}
+        path: release/

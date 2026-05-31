@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log/slog"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"tslink/core"
 )
 
-func serviceLogic(configPath, configURL string, logger *slog.Logger) bool {
+func serviceLogic(configPath string, isTsnetDebug bool, configURL string, logger *slog.Logger) bool {
 	// Determine config source: URL takes priority, then file
 	configSource := configPath
 	if configURL != "" {
@@ -28,9 +29,14 @@ func serviceLogic(configPath, configURL string, logger *slog.Logger) bool {
 	}
 
 	ctx, cancelAll := context.WithCancel(context.Background())
+	defer cancelAll()
 	logger.Info("initializing tsnet server")
-	srv, err := core.InitTsNet(ctx, &cfg.Core, logger)
+	srv, err := core.InitTsNet(ctx, &cfg.Core, logger, isTsnetDebug)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			logger.Debug("tsnet initialization timed out, retrying")
+			return false
+		}
 		logger.With(
 			slog.String("error", err.Error())).Error("Error initializing tsnet")
 		os.Exit(1)
@@ -52,7 +58,7 @@ func serviceLogic(configPath, configURL string, logger *slog.Logger) bool {
 	go func() {
 		<-ctx.Done()
 		logger.Debug("stopping tsnet service")
-		srv.Close()
+		_ = srv.Close() // just ignore it
 	}()
 
 	for {
@@ -73,6 +79,7 @@ func serviceLogic(configPath, configURL string, logger *slog.Logger) bool {
 
 func main() {
 	useJsonFormatLogger := flag.Bool("json-format", false, "use json format logger")
+	showTsnetDebugLog := flag.Bool("diagnose", false, "show tsnet debug log on level=debug")
 	logLevel := flag.String("level", "info", "log level (DEBUG|INFO|WARN|ERROR)")
 	configPath := flag.String("c", "config.toml", "path to config file")
 	configURL := flag.String("config-url", core.DefaultConfigURL, "URL to fetch config from (default from build ldflags)")
@@ -83,7 +90,7 @@ func main() {
 	logger.Info("Starting tslink server", "level", *logLevel, "configPath", *configPath)
 
 	for {
-		isStopped := serviceLogic(*configPath, *configURL, logger)
+		isStopped := serviceLogic(*configPath, *showTsnetDebugLog, *configURL, logger)
 		if !isStopped {
 			logger.Warn("tslink server restart")
 		} else {
